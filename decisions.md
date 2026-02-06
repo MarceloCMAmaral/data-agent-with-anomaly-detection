@@ -143,7 +143,7 @@ if len(self._buffer) + len(df) > Config.BUFFER_SIZE:
 ### Diagrama Mermaid
 
 ```mermaid
-graph TD
+graph LR
     subgraph Root["📁 assistente-virtual-dados/"]
         APP["📄 app.py<br/><i>Frontend Streamlit</i>"]
         REQ["📄 requirements.txt"]
