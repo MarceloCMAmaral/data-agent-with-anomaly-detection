@@ -139,62 +139,7 @@ if len(self._buffer) + len(df) > Config.BUFFER_SIZE:
 ---
 
 ## 3. Estrutura de Diretórios
-
-### Diagrama Mermaid
-
-```mermaid
-graph LR
-    subgraph Root["📁 assistente-virtual-dados/"]
-        APP["📄 app.py<br/><i>Frontend Streamlit</i>"]
-        REQ["📄 requirements.txt"]
-        ENV["📄 .env"]
-        DB["🗃️ anexo_desafio_1.db"]
-        
-        subgraph DATA["📁 data/ - Persistência ML"]
-            MODELS["📁 models/"]
-            BUFFER["📁 buffer/"]
-            MODEL_FILE["📄 anomaly_model.joblib"]
-            BUFFER_FILE["📄 buffer.parquet"]
-        end
-        
-        subgraph SRC["📁 src/ - Código Fonte"]
-            CONFIG["📄 config.py<br/><i>Configurações</i>"]
-            
-            subgraph AGENT["📁 agent/ - Core"]
-                SQL_AGENT["📄 sql_agent.py<br/><i>LangGraph</i>"]
-                PROMPTS["📄 prompts.py"]
-                LLM["📄 llm.py<br/><i>Factory LLMs</i>"]
-            end
-            
-            subgraph DATABASE["📁 database/ - Infra"]
-                CONN["📄 connection.py<br/><i>Singleton SQLite</i>"]
-            end
-            
-            subgraph VIZ["📁 visualization/ - Output"]
-                CHARTS["📄 charts.py<br/><i>Plotly</i>"]
-            end
-            
-            subgraph ML["📁 ml/ - Machine Learning"]
-                DETECTOR["📄 anomaly_detector.py<br/><i>Isolation Forest</i>"]
-                DATA_BUF["📄 data_buffer.py<br/><i>Sliding Window</i>"]
-                MANAGER["📄 model_manager.py<br/><i>Lifecycle</i>"]
-            end
-        end
-    end
-    
-    MODELS --> MODEL_FILE
-    BUFFER --> BUFFER_FILE
-    
-    style Root fill:#E3F2FD,stroke:#1565C0,stroke-width:2px
-    style DATA fill:#FFF3E0,stroke:#EF6C00,stroke-width:1px
-    style SRC fill:#E8F5E9,stroke:#2E7D32,stroke-width:1px
-    style AGENT fill:#F3E5F5,stroke:#7B1FA2,stroke-width:1px
-    style DATABASE fill:#FFF9C4,stroke:#FBC02D,stroke-width:1px
-    style VIZ fill:#FFCDD2,stroke:#C62828,stroke-width:1px
-    style ML fill:#CE93D8,stroke:#7B1FA2,stroke-width:1px
-```
-
-### Estrutura em Texto
+### Estrutura em Text
 
 ```
 assistente-virtual-dados/
