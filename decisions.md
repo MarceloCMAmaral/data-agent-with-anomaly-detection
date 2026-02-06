@@ -117,7 +117,7 @@ except Exception as e:
 - **Eficiência:** Formato colunar otimizado para treino
 
 ```python
-# Evição FIFO quando cheio
+# Eviction FIFO quando cheio
 if len(self._buffer) + len(df) > Config.BUFFER_SIZE:
     excess = len(self._buffer) + len(df) - Config.BUFFER_SIZE
     self._buffer = self._buffer.iloc[excess:]
