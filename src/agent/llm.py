@@ -1,5 +1,5 @@
 """
-LLM Factory - Supports OpenAI and Google Gemini.
+LLM Factory - Supports OpenAI, Google Gemini, and DeepSeek.
 """
 from functools import lru_cache
 from langchain_core.language_models import BaseChatModel
@@ -12,7 +12,7 @@ def get_llm(provider: str = None) -> BaseChatModel:
     Get a cached LLM instance.
     
     Args:
-        provider: LLM provider ("openai" or "gemini"). 
+        provider: LLM provider ("openai", "gemini", or "deepseek"). 
                   Defaults to Config.LLM_PROVIDER.
     
     Returns:
@@ -37,8 +37,15 @@ def get_llm(provider: str = None) -> BaseChatModel:
             temperature=0,
             google_api_key=Config.GOOGLE_API_KEY,
         )
+    elif provider == "deepseek":
+        from langchain_deepseek import ChatDeepSeek
+        return ChatDeepSeek(
+            model=Config.DEEPSEEK_MODEL,
+            temperature=0,
+            api_key=Config.DEEPSEEK_API_KEY,
+        )
     else:
-        raise ValueError(f"Unsupported LLM provider: {provider}. Use 'openai' or 'gemini'.")
+        raise ValueError(f"Unsupported LLM provider: {provider}. Use 'openai', 'gemini', or 'deepseek'.")
 
 
 def get_available_providers() -> list[str]:
@@ -54,5 +61,7 @@ def get_available_providers() -> list[str]:
         providers.append("openai")
     if Config.GOOGLE_API_KEY:
         providers.append("gemini")
+    if Config.DEEPSEEK_API_KEY:
+        providers.append("deepseek")
     
     return providers

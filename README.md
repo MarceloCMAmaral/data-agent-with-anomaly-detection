@@ -114,7 +114,7 @@ flowchart LR
 
 ### Pré-requisitos
 - Python 3.10 ou superior
-- Chave de API (OpenAI ou Google Gemini)
+- Chave de API (OpenAI, Google Gemini ou DeepSeek)
 
 ### Instalação
 
@@ -138,7 +138,12 @@ flowchart LR
    Copie o exemplo:
    cp .env.example .env
    
-   Edite o arquivo .env e insira sua chave (OPENAI_API_KEY ou GOOGLE_API_KEY) e escolha o provider (openai ou gemini).
+   Edite o arquivo .env e insira sua chave de API:
+   - `OPENAI_API_KEY` para OpenAI (GPT-4o-mini)
+   - `GOOGLE_API_KEY` para Google Gemini
+   - `DEEPSEEK_API_KEY` para DeepSeek (V3)
+   
+   Defina o provider desejado em `LLM_PROVIDER` (openai, gemini ou deepseek).
 
 5. Execute a aplicação:
    streamlit run app.py

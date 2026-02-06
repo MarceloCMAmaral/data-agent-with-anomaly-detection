@@ -64,12 +64,13 @@ def render_sidebar():
         
         if not available_providers:
             st.error("Nenhuma API key configurada!")
-            st.info("Configure OPENAI_API_KEY ou GOOGLE_API_KEY no arquivo .env")
+            st.info("Configure OPENAI_API_KEY, GOOGLE_API_KEY ou DEEPSEEK_API_KEY no arquivo .env")
             return False
         
         provider_labels = {
             "openai": "OpenAI (GPT-4o-mini)",
             "gemini": "Google Gemini",
+            "deepseek": "DeepSeek (V3)",
         }
         
         selected_provider = st.selectbox(

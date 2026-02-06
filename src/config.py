@@ -12,12 +12,13 @@ load_dotenv()
 class Config:
     """Application configuration."""
     
-    # LLM Provider: "openai" or "gemini"
+    # LLM Provider: "openai", "gemini", or "deepseek"
     LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "openai")
     
     # API Keys
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "")
+    DEEPSEEK_API_KEY: str = os.getenv("DEEPSEEK_API_KEY", "")
     
     # Database
     DATABASE_PATH: str = os.getenv("DATABASE_PATH", "./anexo_desafio_1.db")
@@ -25,6 +26,7 @@ class Config:
     # LLM Models
     OPENAI_MODEL: str = "gpt-4o-mini"
     GEMINI_MODEL: str = "gemini-2.5-flash"
+    DEEPSEEK_MODEL: str = "deepseek-chat"  # DeepSeek-V3
     
     # Agent Configuration
     MAX_RETRY_ATTEMPTS: int = 3
@@ -53,14 +55,17 @@ class Config:
         """Validate configuration and return list of errors."""
         errors = []
         
-        if cls.LLM_PROVIDER not in ["openai", "gemini"]:
-            errors.append(f"Invalid LLM_PROVIDER: {cls.LLM_PROVIDER}. Must be 'openai' or 'gemini'.")
+        if cls.LLM_PROVIDER not in ["openai", "gemini", "deepseek"]:
+            errors.append(f"Invalid LLM_PROVIDER: {cls.LLM_PROVIDER}. Must be 'openai', 'gemini', or 'deepseek'.")
         
         if cls.LLM_PROVIDER == "openai" and not cls.OPENAI_API_KEY:
             errors.append("OPENAI_API_KEY is required when using OpenAI provider.")
         
         if cls.LLM_PROVIDER == "gemini" and not cls.GOOGLE_API_KEY:
             errors.append("GOOGLE_API_KEY is required when using Gemini provider.")
+        
+        if cls.LLM_PROVIDER == "deepseek" and not cls.DEEPSEEK_API_KEY:
+            errors.append("DEEPSEEK_API_KEY is required when using DeepSeek provider.")
         
         db_path = Path(cls.DATABASE_PATH)
         if not db_path.exists():
