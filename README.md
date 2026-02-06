@@ -17,7 +17,8 @@ Diferente de abordagens simples (RAG padrão ou Chains lineares), esta solução
 * **🔄 Auto-Correção de Erros:** Se a query falhar (ex: erro de sintaxe), o agente lê o erro, ajusta a query e tenta novamente (loop de feedback).
 * **📉 Otimização de Contexto (Granularidade):** O agente seleciona apenas as tabelas relevantes para a pergunta antes de carregar o schema, economizando tokens em bancos grandes.
 * **🧠 Transparência (White-box):** Exibe o "raciocínio" do modelo, a query gerada e as tabelas selecionadas via UI.
-* **📊 Visualização Inteligente:** Detecta automaticamente o tipo de dado e plota o gráfico mais adequado (Linhas, Barras, Pizza) usando Plotly, evitando erros comuns de plotagem.
+* **📊 Visualização Inteligente:** Detecta automaticamente o tipo de dado e plota o gráfico mais adequado (Linhas, Barras, Pizza) usando Plotly.
+* **🤖 Detecção de Anomalias (ML):** Utiliza Isolation Forest para identificar valores atípicos nos resultados das queries, alertando o usuário sobre possíveis inconsistências.
 
 ---
 
@@ -44,7 +45,8 @@ graph LR
     Execute -- Erro --> Correct[🔧 Corrigir Query]
     Correct -- Tenta Novamente --> Execute
     
-    Execute -- Sucesso --> Response[🗣️ Formular Resposta]
+    Execute -- Sucesso --> Anomaly[🤖 Detectar Anomalias]
+    Anomaly --> Response[🗣️ Formular Resposta]
     Response --> End([Fim])
     
     %% Estilização
@@ -56,6 +58,7 @@ graph LR
     style Generate fill:#E3F2FD,stroke:#1565C0,stroke-width:2px,color:#000
     style FilterAction fill:#E3F2FD,stroke:#1565C0,stroke-width:2px,color:#000
     style Response fill:#E3F2FD,stroke:#1565C0,stroke-width:2px,color:#000
+    style Anomaly fill:#CE93D8,stroke:#7B1FA2,stroke-width:2px,color:#000
     
     style Filter fill:#FFF9C4,stroke:#FBC02D,stroke-width:2px,color:#000
     style Execute fill:#FFF9C4,stroke:#FBC02D,stroke-width:2px,color:#000
@@ -73,7 +76,8 @@ flowchart LR
     D --> E["Nó: Obter Schema"]
     E --> F["Nó: Gerar Query (LLM)"]
     F --> G{"Executar Query (SQLite)"}
-    G -- "Sucesso" --> H["Nó: Formular Resposta (LLM)"]
+    G -- "Sucesso" --> ML["Nó: Detectar Anomalias (ML)"]
+    ML --> H["Nó: Formular Resposta (LLM)"]
     G -- "Erro" --> I["Nó: Corrigir Query (LLM)"]
     I --> G
     H --> J["Visualização (Plotly)"]
@@ -102,6 +106,7 @@ flowchart LR
     
     style G fill:#FFF9C4,stroke:#FBC02D,stroke-width:2px,color:#000
     style I fill:#FFCDD2,stroke:#C62828,stroke-width:2px,color:#000
+    style ML fill:#CE93D8,stroke:#7B1FA2,stroke-width:2px,color:#000
 ```
 ---
 
@@ -155,6 +160,47 @@ Durante o desenvolvimento, a arquitetura de Agentes (LangGraph) foi escolhida em
 3. **Visualização "Data-Aware":**
    O módulo de gráficos contém heurísticas para tratar séries temporais corretamente, agrupando dados por categorias e evitando gráficos quebrados.
 
+4. **Detecção de Anomalias (ML):**
+   Sistema híbrido de ML com Isolation Forest que detecta valores atípicos nos resultados das queries, alertando o usuário sobre possíveis inconsistências.
+
+---
+
+## 🤖 Sistema de Detecção de Anomalias
+
+### Estratégia "Warm-up"
+
+O sistema utiliza uma abordagem híbrida para detecção de anomalias:
+
+1. **Buffer de Dados:** Cada resultado de query é armazenado em um buffer de janela deslizante (até 10.000 registros)
+2. **Treinamento Inicial:** Quando houver dados suficientes no buffer, o modelo pode ser treinado via UI
+3. **Inferência em Tempo Real:** Para cada nova query, o modelo atribui um score de anomalia aos dados
+4. **Re-treinamento Periódico:** O modelo pode ser re-treinado para se adaptar ao Data Drift
+
+### Componentes ML
+
+| Componente | Descrição |
+|------------|-----------|
+| `AnomalyDetector` | Wrapper do Isolation Forest com fallback gracioso |
+| `SlidingWindowBuffer` | Buffer thread-safe para acumulação de dados de treinamento |
+| `ModelManager` | Gerenciamento do ciclo de vida do modelo |
+
+### Uso na UI
+
+No menu lateral, a seção "🤖 Machine Learning" exibe:
+- **Dados no Buffer:** Quantidade de registros acumulados para treinamento
+- **Barra de Progresso:** Percentual de preenchimento do buffer
+- **Status do Modelo:** Indica se o modelo está treinado e ativo
+- **Botão "Treinar Modelo":** Treina o modelo com os dados do buffer
+
+### Configurações (Variáveis de Ambiente)
+
+| Variável | Padrão | Descrição |
+|----------|--------|-----------|
+| `ANOMALY_THRESHOLD` | -0.5 | Limiar para detecção de anomalia |
+| `MODEL_PATH` | ./data/models/anomaly_model.joblib | Caminho para persistência do modelo |
+| `BUFFER_SIZE` | 10000 | Tamanho máximo do buffer de dados |
+| `CONTAMINATION_RATE` | 0.05 | Taxa estimada de anomalias (5%) |
+
 ---
 
 ## 📂 Estrutura de Arquivos
@@ -165,6 +211,9 @@ assistente-virtual-dados/
 ├── requirements.txt          # Dependências
 ├── anexo_desafio_1.db        # Banco de Dados SQLite
 ├── .env                      # Variáveis de Ambiente
+├── data/
+│   ├── models/               # Modelos ML persistidos (.joblib)
+│   └── buffer/               # Buffer de dados para treinamento
 └── src/
     ├── config.py             # Configurações Globais
     ├── agent/
@@ -173,8 +222,12 @@ assistente-virtual-dados/
     │   └── llm.py            # Configuração dos Modelos
     ├── database/
     │   └── connection.py     # Gestão da Conexão (Singleton)
-    └── visualization/
-        └── charts.py         # Geração de Gráficos Plotly
+    ├── visualization/
+    │   └── charts.py         # Geração de Gráficos Plotly
+    └── ml/                   # Módulo de Machine Learning
+        ├── anomaly_detector.py   # Detector de Anomalias (Isolation Forest)
+        ├── data_buffer.py        # Buffer de Dados (Janela Deslizante)
+        └── model_manager.py      # Gerenciamento do Ciclo de Vida do Modelo
 ```
 
 ---

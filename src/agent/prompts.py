@@ -98,3 +98,18 @@ Instruções:
 
 Resposta:
 """
+
+
+ANOMALY_WARNING_PROMPT = """
+⚠️ **ALERTA DE ANOMALIA DETECTADA**
+
+Os dados retornados pela query contêm valores que o sistema de ML identificou como potencialmente anômalos.
+
+**Score de Anomalia:** {anomaly_score:.3f}
+**Detalhes:** {anomaly_details}
+
+**Instruções:**
+1. Mencione na sua resposta que os dados podem conter valores atípicos
+2. Sugira ao usuário verificar os dados originais se os valores parecerem inconsistentes
+3. Não altere os dados, apenas adicione o aviso contextual
+"""

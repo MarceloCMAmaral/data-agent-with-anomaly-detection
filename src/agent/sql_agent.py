@@ -19,7 +19,10 @@ from src.agent.prompts import (
     QUERY_GENERATION_PROMPT,
     QUERY_CORRECTION_PROMPT,
     RESPONSE_GENERATION_PROMPT,
+    ANOMALY_WARNING_PROMPT,
 )
+from src.ml import get_anomaly_detector
+from src.ml.data_buffer import get_data_buffer
 
 
 class SQLAgentState(TypedDict):
@@ -34,6 +37,10 @@ class SQLAgentState(TypedDict):
     final_answer: str
     steps: Annotated[list[str], add]  # Accumulates steps for transparency
     llm_provider: str
+    # Anomaly detection fields
+    anomaly_score: float
+    is_anomalous: bool
+    anomaly_details: str
 
 
 def list_tables(state: SQLAgentState) -> dict:
@@ -153,6 +160,66 @@ def execute_query(state: SQLAgentState) -> dict:
         }
 
 
+def detect_anomalies(state: SQLAgentState) -> dict:
+    """Node: Detect anomalies in query results using ML."""
+    import ast
+    import pandas as pd
+    
+    query_result = state.get("query_result", "")
+    
+    # Skip if no result or error occurred
+    if not query_result or state.get("error"):
+        return {
+            "anomaly_score": 0.0,
+            "is_anomalous": False,
+            "anomaly_details": "",
+        }
+    
+    try:
+        # Parse query result string to DataFrame
+        data = ast.literal_eval(query_result)
+        if isinstance(data, list) and len(data) > 0:
+            df = pd.DataFrame(data)
+        else:
+            return {
+                "anomaly_score": 0.0,
+                "is_anomalous": False,
+                "anomaly_details": "Dados insuficientes",
+            }
+        
+        # Run anomaly detection
+        detector = get_anomaly_detector()
+        result = detector.detect(df)
+        
+        # Buffer data for future training (non-blocking)
+        try:
+            buffer = get_data_buffer()
+            buffer.add(df)
+        except Exception:
+            pass  # Don't fail on buffer errors
+        
+        # Build step message
+        if result["is_anomalous"]:
+            step = f"⚠️ **Anomalia detectada!** Score: {result['score']:.3f}"
+        else:
+            step = f"✅ **Dados normais** (Score: {result['score']:.3f})"
+        
+        return {
+            "anomaly_score": result["score"],
+            "is_anomalous": result["is_anomalous"],
+            "anomaly_details": result["details"],
+            "steps": [step],
+        }
+    
+    except Exception as e:
+        # Fail-soft: Don't block the pipeline on ML errors
+        return {
+            "anomaly_score": 0.0,
+            "is_anomalous": False,
+            "anomaly_details": f"Erro na detecção: {str(e)}",
+            "steps": [f"⚙️ **Detecção de anomalia:** {str(e)}"],
+        }
+
 def correct_query(state: SQLAgentState) -> dict:
     """Node: Correct SQL query based on error."""
     llm = get_llm(state.get("llm_provider"))
@@ -195,13 +262,22 @@ def formulate_response(state: SQLAgentState) -> dict:
             "steps": ["⚠️ **Não foi possível completar a consulta**"],
         }
     
-    prompt = RESPONSE_GENERATION_PROMPT.format(
+    # Build base prompt
+    base_prompt = RESPONSE_GENERATION_PROMPT.format(
         question=state["question"],
         query=state["query"],
         result=state["query_result"],
     )
     
-    response = llm.invoke(prompt)
+    # Inject anomaly warning if detected
+    if state.get("is_anomalous"):
+        anomaly_context = ANOMALY_WARNING_PROMPT.format(
+            anomaly_score=state.get("anomaly_score", 0),
+            anomaly_details=state.get("anomaly_details", ""),
+        )
+        base_prompt = anomaly_context + "\n\n" + base_prompt
+    
+    response = llm.invoke(base_prompt)
     answer = response.content.strip()
     
     return {
@@ -227,6 +303,7 @@ def build_sql_agent() -> StateGraph:
     workflow.add_node("get_schema", get_schema)
     workflow.add_node("generate_query", generate_query)
     workflow.add_node("execute_query", execute_query)
+    workflow.add_node("detect_anomalies", detect_anomalies)  # NEW: ML anomaly detection
     workflow.add_node("correct_query", correct_query)
     workflow.add_node("formulate_response", formulate_response)
     
@@ -243,10 +320,11 @@ def build_sql_agent() -> StateGraph:
         should_retry,
         {
             "correct": "correct_query",
-            "respond": "formulate_response",
+            "respond": "detect_anomalies",  # CHANGED: Go to anomaly detection first
         }
     )
     workflow.add_edge("correct_query", "execute_query")
+    workflow.add_edge("detect_anomalies", "formulate_response")  # NEW: Then to response
     workflow.add_edge("formulate_response", END)
     
     return workflow.compile()
@@ -295,6 +373,10 @@ def run_agent(question: str, llm_provider: str = None) -> dict:
         "final_answer": "",
         "steps": [],
         "llm_provider": llm_provider or Config.LLM_PROVIDER,
+        # Anomaly detection fields
+        "anomaly_score": 0.0,
+        "is_anomalous": False,
+        "anomaly_details": "",
     }
     
     result = agent.invoke(initial_state)
@@ -306,4 +388,7 @@ def run_agent(question: str, llm_provider: str = None) -> dict:
         "final_answer": result.get("final_answer", ""),
         "steps": result.get("steps", []),
         "error": result.get("error", ""),
+        "is_anomalous": result.get("is_anomalous", False),
+        "anomaly_score": result.get("anomaly_score", 0.0),
+        "anomaly_details": result.get("anomaly_details", ""),
     }

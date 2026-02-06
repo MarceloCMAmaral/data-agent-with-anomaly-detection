@@ -34,6 +34,14 @@ class Config:
     MAX_BARS_CHART: int = 15  # Max items for bar chart before falling back to table
     MIN_ROWS_HISTOGRAM: int = 10  # Minimum rows to show histogram
     
+    # Machine Learning - Anomaly Detection
+    ANOMALY_THRESHOLD: float = float(os.getenv("ANOMALY_THRESHOLD", "-0.5"))
+    MODEL_PATH: str = os.getenv("MODEL_PATH", "./data/models/anomaly_model.joblib")
+    BUFFER_PATH: str = os.getenv("BUFFER_PATH", "./data/buffer")
+    BUFFER_SIZE: int = int(os.getenv("BUFFER_SIZE", "10000"))
+    CONTAMINATION_RATE: float = float(os.getenv("CONTAMINATION_RATE", "0.05"))
+    RETRAIN_INTERVAL: int = int(os.getenv("RETRAIN_INTERVAL", "500"))
+    
     @classmethod
     def get_database_uri(cls) -> str:
         """Get the SQLite database URI."""

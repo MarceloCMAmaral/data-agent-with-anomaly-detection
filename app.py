@@ -9,6 +9,8 @@ from src.agent.llm import get_available_providers
 from src.database import get_db_info
 from src.visualization import display_data
 from src.config import Config
+from src.ml.anomaly_detector import get_anomaly_detector
+from src.ml.data_buffer import get_data_buffer
 
 
 # Page configuration
@@ -121,6 +123,61 @@ def render_sidebar():
                 st.session_state.pending_question = example
                 st.rerun()
         
+        st.divider()
+        
+        # ML Training Section
+        st.header("🤖 Machine Learning")
+        
+        # Buffer Visualizer
+        try:
+            buffer = get_data_buffer()
+            buffer_size = buffer.size()
+            max_buffer = Config.BUFFER_SIZE
+            
+            st.metric("Dados no Buffer", f"{buffer_size:,} / {max_buffer:,}")
+            
+            # Progress bar showing buffer fill percentage
+            progress = min(buffer_size / max_buffer, 1.0) if max_buffer > 0 else 0
+            st.progress(progress, text=f"{progress*100:.1f}% preenchido")
+            
+            # Training recommendation
+            if buffer_size < 100:
+                st.info("📊 Execute consultas para popular o buffer de treinamento")
+            elif buffer_size >= 100:
+                st.success("✅ Buffer pronto para treinamento!")
+        except Exception as e:
+            st.warning(f"Buffer não disponível: {e}")
+        
+        # Model Status
+        try:
+            detector = get_anomaly_detector()
+            if detector.model is not None:
+                st.success("🧠 Modelo treinado e ativo")
+            else:
+                st.warning("⚠️ Modelo não treinado")
+        except Exception:
+            st.warning("⚠️ Detector não disponível")
+        
+        # Training Button
+        if st.button("🎯 Treinar Modelo", use_container_width=True, type="primary"):
+            with st.spinner("Treinando modelo..."):
+                try:
+                    detector = get_anomaly_detector()
+                    buffer = get_data_buffer()
+                    training_data = buffer.get_training_data()
+                    
+                    if len(training_data) < 10:
+                        st.error("❌ Dados insuficientes! Execute mais consultas primeiro.")
+                    else:
+                        success = detector.train(training_data)
+                        if success:
+                            st.success(f"✅ Modelo treinado com {len(training_data)} amostras!")
+                            st.rerun()
+                        else:
+                            st.error("❌ Falha no treinamento. Verifique os logs.")
+                except Exception as e:
+                    st.error(f"❌ Erro: {e}")
+        
         return True
 
 
@@ -128,6 +185,10 @@ def render_chat_history():
     """Render the chat history."""
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
+            # Show anomaly alert if present (at top of message)
+            if message.get("is_anomalous"):
+                st.warning(f"⚠️ Anomalia detectada (Score: {message.get('anomaly_score', 0):.3f})")
+            
             st.markdown(message["content"])
             
             if message["role"] == "assistant":
@@ -182,6 +243,10 @@ def process_question(question: str):
                     "error": str(e),
                 }
         
+        # Show anomaly alert if detected
+        if result.get("is_anomalous"):
+            st.warning(f"⚠️ **Anomalia detectada!** Score: {result.get('anomaly_score', 0):.3f}")
+        
         # Show final answer
         st.markdown(result.get("final_answer", ""))
         
@@ -202,6 +267,8 @@ def process_question(question: str):
             "steps": result.get("steps", []),
             "query": result.get("query", ""),
             "query_result": result.get("query_result", ""),
+            "is_anomalous": result.get("is_anomalous", False),
+            "anomaly_score": result.get("anomaly_score", 0.0),
         })
 
 
